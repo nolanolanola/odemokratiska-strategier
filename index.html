@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Utforska Odemokratiska Strategier i Politik</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Grundläggande styling */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #fff; /* Vit bakgrund */
+            color: #000; /* Svart text */
+            font-family: Arial, sans-serif;
+        }
+
+        /* Titel ovanför spelet */
+        #gameTitle {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-bottom: 2px solid #ccc;
+        }
+
+        /* Spelområdet */
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            background-color: #fff; /* Vit bakgrund */
+            touch-action: none; /* Förhindrar standard touch-beteende */
+        }
+
+        /* Popup-fönster för information */
+        #popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 80%;
+            max-width: 400px;
+            background-color: rgba(255,255,255,0.95);
+            padding: 20px;
+            border: 2px solid #000;
+            display: block;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s, transform 0.5s;
+            text-align: left; /* Text vänsterjusterad för bättre läsbarhet */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border-radius: 8px;
+        }
+
+        #popup.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #popup h2 {
+            margin-top: 0;
+            text-align: center;
+            font-size: 20px;
+        }
+
+        #popup p {
+            line-height: 1.6;
+        }
+
+        /* On-screen kontroller för mobil */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 5;
+        }
+
+        .control-button {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(0,0,0,0.5);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .control-button:active {
+            background-color: rgba(0,0,0,0.7);
+        }
+
+        /* Anpassa canvas för mobilskärmar */
+        @media (max-width: 600px) {
+            #gameCanvas {
+                width: 100%;
+                height: auto;
+            }
+
+            .control-button {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            #gameTitle {
+                font-size: 20px;
+                padding: 8px;
+            }
+
+            #popup {
+                width: 90%;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Titel ovanför spelet -->
+    <div id="gameTitle">Utforska Odemokratiska Strategier i Politik</div>
+
+    <!-- Spelområdet -->
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <!-- Popup-fönster för information -->
+    <div id="popup">
+        <h2 id="popupTitle">Information</h2>
+        <p id="description"></p>
+    </div>
+
+    <!-- On-screen kontroller för mobil -->
+    <div class="controls">
+        <button class="control-button" id="upBtn">↑</button>
+        <button class="control-button" id="leftBtn">←</button>
+        <button class="control-button" id="rightBtn">→</button>
+        <button class="control-button" id="downBtn">↓</button>
+    </div>
+
+    <script>
+        // Variabler
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const player = { x: 400, y: 550, size: 10, speed: 5 };
+        const keys = {};
+        const touchControls = {
+            up: false,
+            down: false,
+            left: false,
+            right: false
+        };
+
+        // Målområden som rör sig upp och ner
+        const goals = [
+            {
+                x: 200, // Mitt till vänster
+                y: 300,
+                width: 50,
+                height: 100,
+                color: 'blue', // Demokraterna blå
+                title: 'Demokraterna',
+                description: `
+<strong>Demokraternas antidemokratiska strategier:</strong><br><br>
+<ul>
+    <li><strong>Inga ID-kort för röstning:</strong> Implementeringen av bristande verifieringssystem för att undergräva valprocessens integritet.</li>
+    <li><strong>Illegala invandrare:</strong> Stimulans av olaglig immigration för att förändra den demografiska balansen och skapa politiskt inflytande.</li>
+    <li><strong>Demografiska förändringar:</strong> Strategier liknande Israels bosättningspolitik i Västbanken för att säkra en judisk majoritet.</li>
+    <li><strong>Externa exempel:</strong> Uppmuntrad rysk inflyttning till Krim för att skapa en pro-rysk majoritet samt försök att minska albanskt inflytande i Serbien och Kosovo.</li>
+    <li><strong>Sri Lanka och tamiler i norr:</strong> Regeringens bosättningspolitik för att minska tamilers politiska makt.</li>
+</ul>
+                `,
+                direction: 1,
+                moving: true,
+                inPopup: false
+            },
+            {
+                x: 600, // Mitt till höger
+                y: 300,
+                width: 50,
+                height: 100,
+                color: 'red', // Republikanerna röd
+                title: 'Republikanerna',
+                description: `
+<strong>Republikanernas antidemokratiska strategier:</strong><br><br>
+<ul>
+    <li><strong>Förnekande av valresultat:</strong> Förnekade resultat som de ansåg ogiltiga, liknande Lukasjenkos handlingar i Vitryssland.</li>
+    <li><strong>Illegala metoder:</strong> Användning av oetiska metoder för att påverka och manipulera valprocessen.</li>
+    <li><strong>Elfenbenskusten – Gbagbo:</strong> Vägrade erkänna valförlust och utlöste politisk kris.</li>
+    <li><strong>Turkiet – Erdoğan:</strong> Krävde omval i Istanbul efter att ha förlorat till oppositionen.</li>
+    <li><strong>Politisk kris:</strong> Utlösning av politiska kriser genom att inte erkänna legitima valresultat.</li>
+</ul>
+                `,
+                direction: -1,
+                moving: true,
+                inPopup: false
+            }
+        ];
+
+        let currentPopup = null; // Håller reda på vilken popup som är öppen
+
+        // Tangenttryckningar
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+
+            // Stäng popup med mellanslag eller Enter
+            if (currentPopup && (e.key === ' ' || e.key === 'Enter')) {
+                closePopup();
+                currentPopup.moving = true;
+                currentPopup.inPopup = false;
+                currentPopup = null;
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // On-screen kontroller för mobil
+        document.getElementById('upBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.up = true;
+        });
+        document.getElementById('upBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.up = false;
+        });
+
+        document.getElementById('downBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.down = true;
+        });
+        document.getElementById('downBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.down = false;
+        });
+
+        document.getElementById('leftBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.left = true;
+        });
+        document.getElementById('leftBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.left = false;
+        });
+
+        document.getElementById('rightBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.right = true;
+        });
+        document.getElementById('rightBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.right = false;
+        });
+
+        function update() {
+            // Spelarens rörelse (tangentbord)
+            if (!currentPopup) {
+                if (keys['arrowup'] || keys['w']) player.y -= player.speed;
+                if (keys['arrowdown'] || keys['s']) player.y += player.speed;
+                if (keys['arrowleft'] || keys['a']) player.x -= player.speed;
+                if (keys['arrowright'] || keys['d']) player.x += player.speed;
+            }
+
+            // Spelarens rörelse (mobilkontroller)
+            if (!currentPopup) {
+                if (touchControls.up) player.y -= player.speed;
+                if (touchControls.down) player.y += player.speed;
+                if (touchControls.left) player.x -= player.speed;
+                if (touchControls.right) player.x += player.speed;
+            }
+
+            // Begränsa spelaren inom canvas
+            player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
+            player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
+
+            // Uppdatera målområdenas position (rör sig upp och ner)
+            goals.forEach(goal => {
+                if (goal.moving) {
+                    goal.y += goal.direction * 2; // Justera hastigheten här
+                    if (goal.y > canvas.height - goal.height / 2 || goal.y < goal.height / 2) {
+                        goal.direction *= -1; // Byt riktning
+                    }
+                }
+
+                // Kontrollera om spelaren når ett mål
+                const isOverlapping = (
+                    player.x > goal.x - goal.width / 2 &&
+                    player.x < goal.x + goal.width / 2 &&
+                    player.y > goal.y - goal.height / 2 &&
+                    player.y < goal.y + goal.height / 2
+                );
+
+                if (isOverlapping && !goal.inPopup && !currentPopup) {
+                    showPopup(goal.title, goal.description);
+                    goal.inPopup = true;
+                    goal.moving = false;
+                    currentPopup = goal;
+                } else if (!isOverlapping && goal.inPopup && currentPopup === goal) {
+                    closePopup();
+                    goal.inPopup = false;
+                    goal.moving = true;
+                    currentPopup = null;
+                }
+            });
+        }
+
+        function draw() {
+            // Rensa canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // "Andas" effekt
+            const time = Date.now() * 0.002;
+            const scaleFactor = 1 + Math.sin(time) * 0.02;
+
+            // Rita målområden
+            goals.forEach(goal => {
+                ctx.save();
+                ctx.translate(goal.x, goal.y);
+                ctx.scale(1, scaleFactor); // Skala vertikalt för "andning"
+                ctx.fillStyle = goal.color;
+                ctx.fillRect(-goal.width / 2, -goal.height / 2, goal.width, goal.height);
+                ctx.restore();
+            });
+
+            // Rita spelaren
+            ctx.fillStyle = 'black'; // Spelaren svart
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function showPopup(title, text) {
+            const popup = document.getElementById('popup');
+            const description = document.getElementById('description');
+            const popupTitle = document.getElementById('popupTitle');
+            popupTitle.textContent = title;
+            description.innerHTML = text;
+            popup.classList.add('active');
+        }
+
+        function closePopup() {
+            const popup = document.getElementById('popup');
+            popup.classList.remove('active');
+        }
+
+        // Starta spelet
+        loop();
+    </script>
+</body>
+</html>
